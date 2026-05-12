@@ -1,1 +1,81 @@
+name: Build Gmail-infinity to EXE
 
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Install PyInstaller
+      run: pip install pyinstaller
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --onefile --console `
+          --add-data "config;config" `
+          --add-data "core;core" `
+          --add-data "creators;creators" `
+          --add-data "identity;identity" `
+          --add-data "verification;verification" `
+          --add-data "warming;warming" `
+          --add-data "api;api" `
+          --hidden-import yaml `
+          --hidden-import selenium `
+          --hidden-import selenium.webdriver `
+          --hidden-import requests `
+          --hidden-import PIL `
+          --hidden-import PIL.Image `
+          --hidden-import fake_useragent `
+          --hidden-import websocket `
+          --hidden-import websockets `
+          --hidden-import flask `
+          --hidden-import flask_cors `
+          --hidden-import json `
+          --hidden-import threading `
+          --hidden-import asyncio `
+          --clean `
+          --name=GmailInfinity `
+          main.py
+
+    - name: Upload EXE artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: GmailInfinity-${{ github.sha }}
+        path: dist/GmailInfinity.exe
+        retention-days: 30
+
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/GmailInfinity.exe
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
